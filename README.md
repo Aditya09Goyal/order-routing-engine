@@ -7,6 +7,9 @@ A full-stack logistics decision platform inspired by Amazon, Flipkart, and Blink
 ## 📑 Table of Contents
 
 - [Overview](#-overview)
+- ## Application Interface
+- <img width="638" height="277" alt="image" src="https://github.com/user-attachments/assets/ab3ec579-1485-42b1-9b4b-d39633b1b523" />
+
 - [Key Features](#-key-features)
 - [Tech Stack](#-tech-stack)
 - [Project Structure](#-project-structure)
