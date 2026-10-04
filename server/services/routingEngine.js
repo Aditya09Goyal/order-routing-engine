@@ -1,21 +1,5 @@
 const RoutingConfig = require('../models/RoutingConfig');
-
-function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = deg2rad(lat2 - lat1);
-  const dLon = deg2rad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const d = R * c;
-  return d;
-}
-
-function deg2rad(deg) {
-  return deg * (Math.PI / 180);
-}
+const { getRoadDistances } = require('./roadDistance');
 
 exports.selectBestWarehouse = async (inventories, quantity, customerLat, customerLng) => {
   let bestScore = -1;
@@ -74,9 +58,13 @@ exports.selectBestWarehouse = async (inventories, quantity, customerLat, custome
   let minRawDel  = Infinity, maxRawDel  = -Infinity;
   let minRawCost = Infinity, maxRawCost = -Infinity;
 
-  for (const inv of eligibleInventories) {
+  // One OSRM call returns road distances from the customer to every eligible warehouse
+  const roads = await getRoadDistances(customerLat, customerLng, eligibleInventories.map((inv) => inv.warehouseId));
+
+  for (const [idx, inv] of eligibleInventories.entries()) {
     const warehouse = inv.warehouseId;
-    const distance_km = getDistanceFromLatLonInKm(customerLat, customerLng, warehouse.latitude, warehouse.longitude);
+    const road = roads[idx];
+    const distance_km = road.km;
 
     // Raw Distance Score — closer is better
     const rawDistScore = 1 / (1 + distance_km);
@@ -111,7 +99,7 @@ exports.selectBestWarehouse = async (inventories, quantity, customerLat, custome
 
     rawScores.push({
       warehouse, inv,
-      distance_km, delivery_days, cost, dispatchTime, shipmentSpeed, costPerKm,
+      distance_km, delivery_days, cost, dispatchTime, shipmentSpeed, costPerKm, road,
       rawDistScore, rawInvScore, rawDelScore, rawCostScore
     });
   }
@@ -119,7 +107,7 @@ exports.selectBestWarehouse = async (inventories, quantity, customerLat, custome
   for (const item of rawScores) {
     const {
       warehouse, inv,
-      distance_km, delivery_days, cost, dispatchTime, shipmentSpeed, costPerKm,
+      distance_km, delivery_days, cost, dispatchTime, shipmentSpeed, costPerKm, road,
       rawDistScore, rawInvScore, rawDelScore, rawCostScore
     } = item;
 
@@ -135,6 +123,8 @@ exports.selectBestWarehouse = async (inventories, quantity, customerLat, custome
     allScores.push({
       warehouseName: warehouse.warehouseName,
       distance_km,
+      straightLineKm: road.straightKm,
+      distanceSource: road.source,
       delivery_days,
       dispatchTime,
       shipmentSpeed,
@@ -173,4 +163,3 @@ exports.selectBestWarehouse = async (inventories, quantity, customerLat, custome
     }
   };
 };
-
