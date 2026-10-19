@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Box, Card, CardContent, Typography, TextField, Button, Alert, Link } from '@mui/material';
+import { Box, Card, CardContent, Typography, TextField, Button, Alert, Link, InputAdornment, IconButton } from '@mui/material';
+import { Eye, EyeOff } from 'lucide-react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import api from '../api/axios';
 
@@ -7,6 +8,8 @@ const Register = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const navigate = useNavigate();
@@ -70,7 +73,22 @@ const Register = () => {
             <TextField
               fullWidth
               label="Password"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      onClick={() => setShowPassword((v) => !v)}
+                      onMouseDown={(e) => e.preventDefault()}
+                      edge="end"
+                    >
+                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </IconButton>
+                  </InputAdornment>
+                )
+              }}
+              sx={{ '& input::-ms-reveal': { display: 'none' } }}
               variant="outlined"
               margin="normal"
               value={password}
@@ -80,7 +98,22 @@ const Register = () => {
             <TextField
               fullWidth
               label="Confirm Password"
-              type="password"
+              type={showConfirm ? 'text' : 'password'}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label={showConfirm ? 'Hide password' : 'Show password'}
+                      onClick={() => setShowConfirm((v) => !v)}
+                      onMouseDown={(e) => e.preventDefault()}
+                      edge="end"
+                    >
+                      {showConfirm ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </IconButton>
+                  </InputAdornment>
+                )
+              }}
+              sx={{ '& input::-ms-reveal': { display: 'none' } }}
               variant="outlined"
               margin="normal"
               value={confirmPassword}

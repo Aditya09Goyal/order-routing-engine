@@ -5,7 +5,7 @@ export const theme = createTheme({
     mode: 'dark',
     background: {
       default: '#0a0a0f',
-      paper: 'rgba(255, 255, 255, 0.05)',
+      paper: '#16161c',
     },
     primary: {
       main: '#7c3aed', // vibrant purple

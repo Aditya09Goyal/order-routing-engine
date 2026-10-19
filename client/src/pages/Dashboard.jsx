@@ -14,16 +14,16 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [warehousesRes, productsRes, ordersRes] = await Promise.all([
+          const [warehousesRes, productsRes, statsRes] = await Promise.all([
           api.get('/warehouses'),
           api.get('/products'),
-          api.get('/orders')
+          api.get('/orders/stats') // just the counts, not every order
         ]);
-        
+
         const warehouses = warehousesRes.data.data.length;
         const products = productsRes.data.data.length;
-        const activeOrders = ordersRes.data.data.filter(o => o.status === 'assigned' || o.status === 'pending').length;
-        const fulfilledOrders = ordersRes.data.data.filter(o => o.status === 'fulfilled').length;
+        const activeOrders = statsRes.data.data.active;
+        const fulfilledOrders = statsRes.data.data.fulfilled;
 
         setStats({ warehouses, products, activeOrders, fulfilledOrders });
       } catch (error) {

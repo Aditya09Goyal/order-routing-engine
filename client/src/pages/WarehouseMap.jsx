@@ -27,10 +27,10 @@ const WarehouseMap = () => {
       try {
         const [wRes, oRes] = await Promise.all([
           api.get('/warehouses'),
-          api.get('/orders')
+          api.get('/orders', { params: { status: 'assigned,fulfilled', limit: 200 } })
         ]);
         setWarehouses(wRes.data.data);
-        setOrders(oRes.data.data.filter(o => o.status === 'assigned' || o.status === 'fulfilled'));
+        setOrders(oRes.data.data);
       } catch (err) {
         console.error(err);
       }

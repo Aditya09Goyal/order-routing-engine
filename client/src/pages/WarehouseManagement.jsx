@@ -21,6 +21,8 @@ const WarehouseManagement = () => {
       setWarehouses(res.data.data);
     } catch (err) {
       console.error(err);
+      // Show the server's validation message (e.g. "shipmentSpeed must be at least 1")
+      alert(err.response?.data?.message || 'Could not save the warehouse');
     }
   };
 
@@ -219,7 +221,7 @@ const WarehouseManagement = () => {
               <Grid item xs={4}>
                 <TextField
                   fullWidth label="Shipment Speed (km/d)" type="number"
-                  inputProps={{ min: 1, step: 10 }}
+                  inputProps={{ min: 1, step: 1 }}
                   helperText="Distance covered per day"
                   value={formData.shipmentSpeed}
                   onChange={field('shipmentSpeed')}

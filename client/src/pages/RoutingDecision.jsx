@@ -128,7 +128,7 @@ const RoutingDecision = () => {
               <TableHead>
                 <TableRow>
                   <TableCell>Warehouse</TableCell>
-                  <TableCell>Distance (km)</TableCell>
+                  <TableCell>Road Distance (km)</TableCell>
                   <TableCell>Dispatch (h)</TableCell>
                   <TableCell>Speed (km/d)</TableCell>
                   <TableCell>Delivery (days)</TableCell>
@@ -141,22 +141,25 @@ const RoutingDecision = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {allScores.sort((a, b) => b.finalScore - a.finalScore).map((s) => (
+                {allScores.sort((a, b) => b.finalScore - a.finalScore).map((s) => {
+                  // Match by ID (older saved records have no warehouseId, so fall back to name)
+                  const isWinner = s.warehouseId
+                    ? s.warehouseId === String(selectedWarehouse._id)
+                    : s.warehouseName === selectedWarehouse.warehouseName;
+                  return (
                   <TableRow
-                    key={s.warehouseName}
+                    key={s.warehouseId || s.warehouseName}
                     sx={{
-                      backgroundColor: s.warehouseName === selectedWarehouse.warehouseName
-                        ? 'rgba(16, 185, 129, 0.1)' : 'inherit',
-                      borderLeft: s.warehouseName === selectedWarehouse.warehouseName
-                        ? '4px solid #10b981' : 'none'
+                      backgroundColor: isWinner ? 'rgba(16, 185, 129, 0.1)' : 'inherit',
+                      borderLeft: isWinner ? '4px solid #10b981' : 'none'
                     }}
                   >
                     <TableCell>
                       {s.warehouseName}
-                      {s.warehouseName === selectedWarehouse.warehouseName &&
+                      {isWinner &&
                         <Chip label="WINNER" size="small" color="success" sx={{ ml: 1 }} />}
                     </TableCell>
-                    <TableCell>{s.distance_km.toFixed(1)}</TableCell>
+                    <TableCell title={s.distanceSource === 'osrm' ? 'Road distance from OSRM' : 'Estimated: straight line x 1.2'}>{s.distanceSource === 'estimate' ? '≈ ' : ''}{s.distance_km.toFixed(1)}</TableCell>
                     <TableCell>
                       <Chip label={`${s.dispatchTime ?? '-'}h`} size="small"
                         sx={{ backgroundColor: 'rgba(124,58,237,0.15)', color: '#a78bfa' }} />
@@ -200,7 +203,8 @@ const RoutingDecision = () => {
                     </TableCell>
                     <TableCell fontWeight="bold">{s.finalScore.toFixed(4)}</TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </TableContainer>

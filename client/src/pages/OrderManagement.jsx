@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Box, Typography, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, Grid, TextField, MenuItem, Card, CardContent } from '@mui/material';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Box, Typography, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip, Grid, TextField, MenuItem, Card, CardContent, TablePagination } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
@@ -9,18 +9,23 @@ const OrderManagement = () => {
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
+  const [page, setPage] = useState(0);            // MUI pages start at 0; the API starts at 1
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalOrders, setTotalOrders] = useState(0);
   
   const [formData, setFormData] = useState({
     customerName: '', customerLatitude: '', customerLongitude: '', productId: '', quantity: ''
   });
   const [loadingRandom, setLoadingRandom] = useState(false);
 
-  const fetchOrders = async () => {
+  // Ask the server for ONE page (newest first). It already sorts, so no .reverse() needed.
+  const fetchOrders = useCallback(async () => {
     try {
-      const res = await api.get('/orders');
-      setOrders(res.data.data.reverse()); // latest first
+      const res = await api.get('/orders', { params: { page: page + 1, limit: rowsPerPage } });
+      setOrders(res.data.data);
+      setTotalOrders(res.data.pagination.total);
     } catch (err) { console.error(err); }
-  };
+  }, [page, rowsPerPage]);
 
   const fetchProducts = async () => {
     try {
@@ -30,15 +35,15 @@ const OrderManagement = () => {
   };
 
   useEffect(() => {
-    fetchOrders();
     fetchProducts();
-
-    const interval = setInterval(() => {
-      fetchOrders();
-    }, 5000);
-
-    return () => clearInterval(interval);
   }, []);
+
+  // Reload the current page now, then every 5 seconds. Re-runs when the page changes.
+  useEffect(() => {
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 5000);
+    return () => clearInterval(interval);
+  }, [fetchOrders]);
 
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
@@ -184,6 +189,15 @@ const OrderManagement = () => {
             ))}
           </TableBody>
         </Table>
+        <TablePagination
+          component="div"
+          rowsPerPageOptions={[5, 10, 25]}
+          count={totalOrders}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={(e, newPage) => setPage(newPage)}
+          onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+        />
       </TableContainer>
     </Box>
   );
