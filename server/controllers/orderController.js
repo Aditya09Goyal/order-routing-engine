@@ -38,7 +38,12 @@ exports.getOrderById = async (req, res) => {
 
 exports.updateOrder = async (req, res) => {
   try {
-    const order = await Order.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    // Only the status can be changed here, and only to "fulfilled".
+    // Before, the whole request body was saved, so anyone could change quantity, warehouse, etc.
+    if (req.body.status !== 'fulfilled') {
+      return res.status(400).json({ success: false, message: 'Only { "status": "fulfilled" } can be updated' });
+    }
+    const order = await Order.findByIdAndUpdate(req.params.id, { status: 'fulfilled' }, { returnDocument: 'after', runValidators: true });
     if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
     res.status(200).json({ success: true, data: order, message: 'Order updated' });
   } catch (error) {

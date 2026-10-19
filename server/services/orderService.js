@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const RoutingHistory = require('../models/RoutingHistory');
 const Order = require('../models/Order');
 const Inventory = require('../models/Inventory');
@@ -5,25 +6,47 @@ const Product = require('../models/Product');
 const routingEngine = require('./routingEngine');
 const aiExplanation = require('./aiExplanation');
 
-exports.processAndRouteOrder = async ({ customerLat, customerLng, productId, quantity, customerName }) => {
-  if (!customerLat || !customerLng || !productId || !quantity) {
-    throw new Error('Missing required fields');
+const MAX_QUANTITY = 1000; // one order can't ask for more than this
+
+// An error that should become HTTP 400 ("your request is wrong"), not 500 ("our server broke")
+const badRequest = (message) => Object.assign(new Error(message), { status: 400 });
+
+exports.processAndRouteOrder = async (input) => {
+  // ---- Step 0: validate input BEFORE touching stock ----
+  // Before this, quantity -5 passed every check and ADDED 5 units to the warehouse.
+  const quantity = Number(input.quantity);
+  const customerLat = Number(input.customerLat);
+  const customerLng = Number(input.customerLng);
+  const { productId } = input;
+  const customerName = typeof input.customerName === 'string' ? input.customerName.trim().slice(0, 100) : '';
+
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QUANTITY) {
+    throw badRequest(`Quantity must be a whole number between 1 and ${MAX_QUANTITY}`);
+  }
+  if (!Number.isFinite(customerLat) || customerLat < -90 || customerLat > 90) {
+    throw badRequest('Customer latitude must be between -90 and 90');
+  }
+  if (!Number.isFinite(customerLng) || customerLng < -180 || customerLng > 180) {
+    throw badRequest('Customer longitude must be between -180 and 180');
+  }
+  if (!mongoose.isValidObjectId(productId)) {
+    throw badRequest('A valid productId is required');
   }
 
   // Step 1: Query inventory
   const inventories = await Inventory.find({ productId }).populate('warehouseId');
   const product = await Product.findById(productId);
   const productName = product ? product.productName : 'Product';
-  
-  // Step 2 & 3: Score and select warehouse
-  const { selectedWarehouse, finalScore, allScores, eliminatedWarehouses, selectedInventory, weights } = await routingEngine.selectBestWarehouse(
+
+  // Step 2 & 3: Score and rank warehouses
+  const { rankedCandidates, allScores, eliminatedWarehouses, weights } = await routingEngine.selectBestWarehouse(
     inventories,
     quantity,
     customerLat,
     customerLng
   );
 
-  if (!selectedWarehouse) {
+  if (rankedCandidates.length === 0) {
     return {
       success: false,
       message: 'No eligible warehouses with sufficient stock found',
@@ -31,12 +54,35 @@ exports.processAndRouteOrder = async ({ customerLat, customerLng, productId, qua
     };
   }
 
-  // Step 4: Reserve inventory
-  selectedInventory.availableQuantity -= quantity;
-  selectedInventory.reservedQuantity += quantity;
-  await selectedInventory.save();
+  // Step 4: Reserve inventory ATOMICALLY.
+  // One database operation checks "is there still enough stock?" AND takes it, so two orders
+  // arriving at the same moment can never both get the same units (no overselling).
+  // If another order took the stock first, we simply try the next-best warehouse.
+  let selected = null;
+  for (const candidate of rankedCandidates) {
+    const reserved = await Inventory.findOneAndUpdate(
+      { _id: candidate.inv._id, availableQuantity: { $gte: quantity } },
+      { $inc: { availableQuantity: -quantity, reservedQuantity: quantity }, $set: { updatedAt: new Date() } },
+      { returnDocument: 'after' }
+    );
+    if (reserved) {
+      selected = candidate;
+      break;
+    }
+  }
 
-  // Create Order (status is assigned by default in schema)
+  if (!selected) {
+    return {
+      success: false,
+      message: 'Stock ran out while placing this order (other orders took it first). Please try again.',
+      data: { eliminatedWarehouses, weights }
+    };
+  }
+
+  const selectedWarehouse = selected.warehouse;
+  const finalScore = selected.finalScore;
+
+  // Create Order. If saving it fails, give the reserved stock back so it isn't lost.
   const newOrder = new Order({
     customerName: customerName || 'Guest',
     customerLatitude: customerLat,
@@ -46,7 +92,15 @@ exports.processAndRouteOrder = async ({ customerLat, customerLng, productId, qua
     assignedWarehouseId: selectedWarehouse._id,
     status: 'assigned'
   });
-  await newOrder.save();
+  try {
+    await newOrder.save();
+  } catch (err) {
+    await Inventory.updateOne(
+      { _id: selected.inv._id },
+      { $inc: { availableQuantity: quantity, reservedQuantity: -quantity } }
+    );
+    throw err;
+  }
 
   // Step 5: Call AI Explanation
   const selectedScoreData = allScores.find(s => s.warehouseName === selectedWarehouse.warehouseName);

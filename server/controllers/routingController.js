@@ -20,8 +20,8 @@ exports.routeOrder = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Routing error:', error);
-    res.status(error.message === 'Missing required fields' ? 400 : 500).json({ success: false, message: error.message });
+    if (!error.status) console.error('Routing error:', error); // log only real server errors
+    res.status(error.status || 500).json({ success: false, message: error.message }); // 400 for bad input
   }
 };
 

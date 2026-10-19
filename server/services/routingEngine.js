@@ -7,6 +7,7 @@ exports.selectBestWarehouse = async (inventories, quantity, customerLat, custome
   let selectedInventory = null;
   const allScores = [];
   const eliminatedWarehouses = [];
+  const rankedCandidates = []; // every eligible warehouse with its score, best first
 
   let config = await RoutingConfig.findOne();
   if (!config) {
@@ -141,6 +142,7 @@ exports.selectBestWarehouse = async (inventories, quantity, customerLat, custome
       finalScore,
       inventory: inv.availableQuantity
     });
+    rankedCandidates.push({ warehouse, inv, finalScore });
 
     if (finalScore > bestScore) {
       bestScore = finalScore;
@@ -148,10 +150,11 @@ exports.selectBestWarehouse = async (inventories, quantity, customerLat, custome
       selectedInventory = inv;
     }
   }
-
+  rankedCandidates.sort((a, b) => b.finalScore - a.finalScore);
   return {
     selectedWarehouse,
     finalScore: bestScore,
+    rankedCandidates,
     allScores,
     eliminatedWarehouses,
     selectedInventory,
