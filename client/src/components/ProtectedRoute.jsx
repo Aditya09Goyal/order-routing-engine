@@ -11,7 +11,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     // If not allowed, redirect to a safe page or dashboard
-    return <Navigate to="/" replace />;
+  return <Navigate to={user.role === 'admin' ? '/' : '/orders'} replace />;
   }
 
   return children;

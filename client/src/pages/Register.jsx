@@ -1,23 +1,15 @@
 import React, { useState } from 'react';
-import { Box, Card, CardContent, Typography, TextField, Button, Alert, ToggleButton, ToggleButtonGroup, Link } from '@mui/material';
+import { Box, Card, CardContent, Typography, TextField, Button, Alert, Link } from '@mui/material';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
-import { Shield, Package } from 'lucide-react';
 import api from '../api/axios';
 
 const Register = () => {
-  const [role, setRole] = useState('admin');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const navigate = useNavigate();
-
-  const handleRoleChange = (event, newRole) => {
-    if (newRole !== null) {
-      setRole(newRole);
-    }
-  };
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -35,7 +27,7 @@ const Register = () => {
     }
 
     try {
-      const res = await api.post('/auth/register', { username, password, role });
+      const res = await api.post('/auth/register', { username, password });
       if (res.data.success) {
         setSuccess('Registration successful! Redirecting to login...');
         setTimeout(() => {
@@ -62,46 +54,9 @@ const Register = () => {
           {success && <Alert severity="success" sx={{ mb: 3 }}>{success}</Alert>}
 
           <form onSubmit={handleRegister}>
-            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-              <ToggleButtonGroup
-                value={role}
-                exclusive
-                onChange={handleRoleChange}
-                aria-label="role selection"
-                fullWidth
-              >
-                <ToggleButton 
-                  value="admin" 
-                  aria-label="admin"
-                  sx={{ 
-                    color: 'text.secondary',
-                    '&.Mui-selected': { 
-                      color: '#7c3aed', 
-                      backgroundColor: 'rgba(124, 58, 237, 0.1)',
-                      border: '1px solid #7c3aed'
-                    }
-                  }}
-                >
-                  <Shield size={20} style={{ marginRight: 8 }} />
-                  Admin
-                </ToggleButton>
-                <ToggleButton 
-                  value="manager" 
-                  aria-label="manager"
-                  sx={{ 
-                    color: 'text.secondary',
-                    '&.Mui-selected': { 
-                      color: '#06b6d4', 
-                      backgroundColor: 'rgba(6, 182, 212, 0.1)',
-                      border: '1px solid #06b6d4'
-                    }
-                  }}
-                >
-                  <Package size={20} style={{ marginRight: 8 }} />
-                  Manager
-                </ToggleButton>
-              </ToggleButtonGroup>
-            </Box>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              New accounts get the <b>Manager</b> role. Admin accounts are created by the system owner.
+            </Alert>
 
             <TextField
               fullWidth

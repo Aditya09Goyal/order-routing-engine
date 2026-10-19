@@ -1,28 +1,20 @@
 import React, { useState } from 'react';
-import { Box, Card, CardContent, Typography, TextField, Button, Alert, ToggleButton, ToggleButtonGroup, Link } from '@mui/material';
+import { Box, Card, CardContent, Typography, TextField, Button, Alert, Link } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
-import { Shield, Package } from 'lucide-react';
 import api from '../api/axios';
 
 const Login = () => {
-  const [role, setRole] = useState('admin');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleRoleChange = (event, newRole) => {
-    if (newRole !== null) {
-      setRole(newRole);
-    }
-  };
-
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const res = await api.post('/auth/login', { username, password, role });
+      const res = await api.post('/auth/login', { username, password });
       if (res.data.success) {
         login(res.data.data);
         navigate('/');
@@ -46,47 +38,6 @@ const Login = () => {
           {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
 
           <form onSubmit={handleLogin}>
-            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-              <ToggleButtonGroup
-                value={role}
-                exclusive
-                onChange={handleRoleChange}
-                aria-label="role selection"
-                fullWidth
-              >
-                <ToggleButton 
-                  value="admin" 
-                  aria-label="admin"
-                  sx={{ 
-                    color: 'text.secondary',
-                    '&.Mui-selected': { 
-                      color: '#7c3aed', 
-                      backgroundColor: 'rgba(124, 58, 237, 0.1)',
-                      border: '1px solid #7c3aed'
-                    }
-                  }}
-                >
-                  <Shield size={20} style={{ marginRight: 8 }} />
-                  Admin
-                </ToggleButton>
-                <ToggleButton 
-                  value="manager" 
-                  aria-label="manager"
-                  sx={{ 
-                    color: 'text.secondary',
-                    '&.Mui-selected': { 
-                      color: '#06b6d4', 
-                      backgroundColor: 'rgba(6, 182, 212, 0.1)',
-                      border: '1px solid #06b6d4'
-                    }
-                  }}
-                >
-                  <Package size={20} style={{ marginRight: 8 }} />
-                  Manager
-                </ToggleButton>
-              </ToggleButtonGroup>
-            </Box>
-
             <TextField
               fullWidth
               label="Username"

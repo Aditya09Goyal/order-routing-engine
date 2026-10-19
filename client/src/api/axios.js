@@ -21,13 +21,18 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle 401/403
+// Response interceptor: log out only when the session is really invalid
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-      console.log(`[Auth] Intercepted ${error.response.status} from API. Forcing logout.`);
-      // Clear local storage and redirect
+    const status = error.response?.status;
+    const isAuthRequest = (error.config?.url || '').startsWith('/auth/');
+    // 401 = token missing/expired -> back to login.
+    // But NOT for the login/register requests themselves: there a 401 just means "wrong password",
+    // and the page must stay so the error message can be shown.
+    // 403 = "your role can't do this" -> stay logged in, the page shows the error.
+    if (status === 401 && !isAuthRequest) {
+      console.log('[Auth] Session expired or invalid. Logging out.');
       localStorage.removeItem('auth_user');
       window.location.href = '/login';
     }
