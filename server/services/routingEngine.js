@@ -41,6 +41,7 @@ exports.selectBestWarehouse = async (inventories, quantity, customerLat, custome
     return {
       selectedWarehouse: null,
       finalScore: 0,
+      rankedCandidates: [], // empty list (not undefined) so callers can safely check .length
       allScores: [],
       eliminatedWarehouses,
       selectedInventory: null,
