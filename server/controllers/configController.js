@@ -18,26 +18,27 @@ exports.getConfig = async (req, res) => {
 
 exports.updateConfig = async (req, res) => {  
   try {
-    const { distanceWeight, inventoryWeight, deliveryWeight, costWeight } = req.body;
-    
-    // Validate inputs
-    if (
-      distanceWeight === undefined || 
-      inventoryWeight === undefined || 
-      deliveryWeight === undefined || 
-      costWeight === undefined
-    ) {
-      return res.status(400).json({ success: false, message: 'All 4 weights must be provided.' });
+    // Each weight must be a real number from 0 to 100, and together they must add up to 100.
+    // Before, only the sum was checked, so 150 + (-50) + 0 + 0 = 100 was accepted
+    // and a NEGATIVE weight made the engine prefer the WORST warehouse for that factor.
+    const names = ['distanceWeight', 'inventoryWeight', 'deliveryWeight', 'costWeight'];
+    const weights = {};
+    for (const name of names) {
+      const value = Number(req.body[name]);
+      if (req.body[name] === undefined || req.body[name] === '' || !Number.isFinite(value) || value < 0 || value > 100) {
+        return res.status(400).json({ success: false, message: `${name} must be a number from 0 to 100.` });
+      }
+      weights[name] = value;
     }
 
-    const sum = Number(distanceWeight) + Number(inventoryWeight) + Number(deliveryWeight) + Number(costWeight);
-    
+    const sum = names.reduce((total, name) => total + weights[name], 0);
     if (Math.abs(sum - 100) > 0.01) {
-      return res.status(400).json({ 
-        success: false, 
-        message: `Weights must sum to exactly 100. Current sum is ${sum}.` 
+      return res.status(400).json({
+        success: false,
+        message: `Weights must sum to exactly 100. Current sum is ${sum}.`
       });
     }
+    const { distanceWeight, inventoryWeight, deliveryWeight, costWeight } = weights;
 
     // Upsert the singleton config
     let config = await RoutingConfig.findOne();
