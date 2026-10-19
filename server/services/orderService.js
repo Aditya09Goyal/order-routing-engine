@@ -7,6 +7,7 @@ const routingEngine = require('./routingEngine');
 const aiExplanation = require('./aiExplanation');
 
 const MAX_QUANTITY = 1000; // one order can't ask for more than this
+const AI_WAIT_MS = 2500;   // longest we make an order wait for the AI explanation
 
 // An error that should become HTTP 400 ("your request is wrong"), not 500 ("our server broke")
 const badRequest = (message) => Object.assign(new Error(message), { status: 400 });
@@ -102,11 +103,12 @@ exports.processAndRouteOrder = async (input) => {
     throw err;
   }
 
-  // Step 5: Call AI Explanation
-  const selectedScoreData = allScores.find(s => s.warehouseName === selectedWarehouse.warehouseName);
-  const rejectedScores = allScores.filter(s => s.warehouseName !== selectedWarehouse.warehouseName);
-
-  const aiExplanationText = await aiExplanation.generateExplanation({
+  // Step 5: AI explanation — a nice-to-have, so it must never slow the order down.
+  // We wait at most AI_WAIT_MS. If Groq is slower (or fails), the customer gets an instant
+  // built-in explanation now, and the AI text replaces it in Routing History when it arrives.
+  const selectedScoreData = selected.scoreData;
+  const rejectedScores = allScores.filter(s => s !== selectedScoreData);
+  const aiPromise = aiExplanation.generateExplanation({
     productName,
     selectedWarehouse: selectedWarehouse.warehouseName,
     distance: selectedScoreData.distance_km,
@@ -122,6 +124,17 @@ exports.processAndRouteOrder = async (input) => {
     rejectedWarehouses: rejectedScores
   });
 
+  let timer;
+  const timeout = new Promise((resolve) => { timer = setTimeout(() => resolve(null), AI_WAIT_MS); });
+  const aiText = await Promise.race([aiPromise, timeout]);
+  clearTimeout(timer);
+
+  const aiExplanationText = aiText || aiExplanation.fallbackExplanation({
+    selectedWarehouse: selectedWarehouse.warehouseName,
+    scoreData: selectedScoreData,
+    otherCount: rejectedScores.length
+  });
+
   // Step 6: Save to Routing History
   const routingHistory = new RoutingHistory({
     orderId: newOrder._id,
@@ -133,6 +146,13 @@ exports.processAndRouteOrder = async (input) => {
     weights
   });
   await routingHistory.save();
+
+  // AI was too slow: when it finally answers, upgrade the saved explanation in the background.
+  if (!aiText) {
+    aiPromise
+      .then((late) => late && RoutingHistory.updateOne({ _id: routingHistory._id }, { routingReason: late }))
+      .catch((err) => console.error('Late AI explanation update failed:', err.message));
+  }
 
   return {
     success: true,

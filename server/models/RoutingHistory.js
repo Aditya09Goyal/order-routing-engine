@@ -11,4 +11,6 @@ const routingHistorySchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
+routingHistorySchema.index({ createdAt: -1 });
+routingHistorySchema.index({ orderId: 1 });
 module.exports = mongoose.model('RoutingHistory', routingHistorySchema);

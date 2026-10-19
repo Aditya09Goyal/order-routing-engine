@@ -43,7 +43,7 @@ mongoose.connect(process.env.MONGODB_URI, {
       
       if (process.env.ENABLE_AUTO_ORDERS === 'true') {
         cron.schedule('*/30 * * * * *', runAutoOrder);
-        console.log('Auto-order cron job started (every 2 minutes)');
+        console.log('Auto-order cron job started (every 30 seconds)');
       }
     });
   })

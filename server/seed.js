@@ -1,5 +1,10 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+// Same DNS workaround as server.js (some networks can't resolve Atlas "mongodb+srv" addresses)
+if (process.env.DNS_SERVERS) {
+  require('dns').setServers(process.env.DNS_SERVERS.split(',').map((x) => x.trim()).filter(Boolean));
+}
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 const Warehouse = require('./models/Warehouse');
 const Product = require('./models/Product');
 const Inventory = require('./models/Inventory');
@@ -8,17 +13,17 @@ const RoutingHistory = require('./models/RoutingHistory');
 const User = require('./models/User');
 const RoutingConfig = require('./models/RoutingConfig');
 
-mongoose.connect(process.env.MONGODB_URI, {
-  serverSelectionTimeoutMS: 30000,
-  socketTimeoutMS: 45000,
-  tls: true,
-  tlsAllowInvalidCertificates: true
-})
-  .then(() => console.log('Connected to MongoDB for seeding'))
-  .catch(err => console.error(err));
-
 const seedData = async () => {
   try {
+    // Connect FIRST and wait. If it fails we stop here with a clear message,
+    // instead of letting deleteMany() hang for 10 seconds and time out.
+    await mongoose.connect(process.env.MONGODB_URI, {
+      serverSelectionTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
+      tls: true
+    });
+    console.log('Connected to MongoDB for seeding');
+
     // Clear existing
     await Warehouse.deleteMany({});
     await Product.deleteMany({});
@@ -29,8 +34,13 @@ const seedData = async () => {
     await RoutingConfig.deleteMany({});
 
     // Users
-    const adminUser = new User({ username: 'admin', password: 'admin123', role: 'admin' });
-    const managerUser = new User({ username: 'manager', password: 'manager123', role: 'manager' });
+    // No hard-coded passwords. Use SEED_ADMIN_PASSWORD / SEED_MANAGER_PASSWORD from .env,
+    // or a random one is generated and printed once at the end of the seed.
+    const randomPassword = () => crypto.randomBytes(9).toString('base64url'); // 12 characters
+    const adminPassword = process.env.SEED_ADMIN_PASSWORD || randomPassword();
+    const managerPassword = process.env.SEED_MANAGER_PASSWORD || randomPassword();
+    const adminUser = new User({ username: 'admin', password: adminPassword, role: 'admin' });
+    const managerUser = new User({ username: 'manager', password: managerPassword, role: 'manager' });
     await adminUser.save();
     await managerUser.save();
 
@@ -129,6 +139,9 @@ const seedData = async () => {
     await Inventory.insertMany(inventoryData);
 
     console.log('Database seeded successfully!');
+    console.log('\n=== Seed logins (save these now; they are not stored anywhere in plain text) ===');
+    console.log(`admin   / ${adminPassword}`);
+    console.log(`manager / ${managerPassword}\n`);
     process.exit();
   } catch (error) {
     console.error('Seeding error:', error);

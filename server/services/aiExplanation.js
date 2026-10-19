@@ -2,12 +2,27 @@ const Groq = require('groq-sdk');
 
 // console.log('Groq key loaded:', process.env.GROQ_API_KEY?.slice(0, 10));
 
-const groq = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
+// timeout + maxRetries so a slow Groq can never hang a request for a minute
+const groq = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY, timeout: 8000, maxRetries: 1 }) : null;
+
+// Instant, no-network explanation used when the AI is slow, fails, or has no API key.
+exports.fallbackExplanation = ({ selectedWarehouse, scoreData, otherCount }) => {
+  const factors = [
+    ['proximity to the customer', scoreData.distWeighted],
+    ['stock availability', scoreData.invWeighted],
+    ['delivery speed', scoreData.delWeighted],
+    ['low shipping cost', scoreData.costWeighted]
+  ].sort((a, b) => b[1] - a[1]);
+  const why = otherCount === 0
+    ? `${selectedWarehouse} was the only eligible warehouse for this order.`
+    : `${selectedWarehouse} had the best overall balance among ${otherCount + 1} eligible warehouses, led by ${factors[0][0]} and ${factors[1][0]}.`;
+  return `${why} It is about ${scoreData.distance_km.toFixed(0)} km from the customer, with an estimated delivery of ${scoreData.delivery_days.toFixed(1)} days.`;
+};
 
 exports.generateExplanation = async ({ productName, selectedWarehouse, distance, inventory, deliveryDays, cost, finalScore, distScore, invScore, delScore, costScore, weights, rejectedWarehouses }) => {
   try {
     if (!groq) {
-      return "AI explanation skipped because GROQ_API_KEY is not set.";
+      return null;
     }
 
 
@@ -46,10 +61,9 @@ NEVER mentions scores to user. They are for your understanding.`;
       max_tokens: 150,
     });
 
-    return chatCompletion.choices[0]?.message?.content || "";
+    return chatCompletion.choices[0]?.message?.content || null;
   } catch (error) {
     console.error('Groq API Error:', error.message);
-    console.error('Full error:', JSON.stringify(error, null, 2));
-    return 'Failed to generate AI explanation.';
+    return null; // caller will use the fallback text
   }
 };

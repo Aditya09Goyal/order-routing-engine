@@ -70,9 +70,11 @@ exports.selectBestWarehouse = async (inventories, quantity, customerLat, custome
     // Raw Distance Score — closer is better
     const rawDistScore = 1 / (1 + distance_km);
 
-    // Raw Inventory Score — more available stock relative to total is better
-    const totalInventory = inv.availableQuantity + inv.reservedQuantity;
-    const rawInvScore = totalInventory > 0 ? (inv.availableQuantity / totalInventory) : 0;
+    // Raw Inventory Score — more units on the shelf is better.
+    // Before, this was available / (available + reserved), a RATIO. A nearly empty warehouse
+    // (2 units, none reserved) scored 1.0 and beat a full one (900 units, 100 reserved = 0.9).
+    // Now we use the absolute stock; min-max normalization below scales it against the other candidates.
+    const rawInvScore = inv.availableQuantity;
 
     // Raw Delivery Score — uses per-warehouse shipment speed + dispatch time
     // delivery_days = transit days + dispatch overhead (in days)
@@ -121,7 +123,8 @@ exports.selectBestWarehouse = async (inventories, quantity, customerLat, custome
     // Weighted Final Score
     const finalScore = (wDist * distScore) + (wInv * invScore) + (wDel * delScore) + (wCost * costScore);
 
-    allScores.push({
+    const scoreData = {
+      warehouseId: String(warehouse._id), // identify by ID: two warehouses can share a name
       warehouseName: warehouse.warehouseName,
       distance_km,
       straightLineKm: road.straightKm,
@@ -141,8 +144,9 @@ exports.selectBestWarehouse = async (inventories, quantity, customerLat, custome
       costWeighted:  wCost * costScore,
       finalScore,
       inventory: inv.availableQuantity
-    });
-    rankedCandidates.push({ warehouse, inv, finalScore });
+    };
+    allScores.push(scoreData);
+    rankedCandidates.push({ warehouse, inv, finalScore, scoreData }); // keep the score row with its warehouse
 
     if (finalScore > bestScore) {
       bestScore = finalScore;
