@@ -1,4 +1,13 @@
 require('dotenv').config();
+if (process.env.DNS_SERVERS) {
+  require('dns').setServers(process.env.DNS_SERVERS.split(',').map((s) => s.trim()).filter(Boolean));
+}
+// Refuse to start without a real JWT secret (before, a public fallback text was used,
+// so anyone could forge an admin login token if the env var was missing)
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  console.error('JWT_SECRET is missing or shorter than 32 characters. Set it in server/.env (and on Render).');
+  process.exit(1);
+}
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -25,7 +34,7 @@ mongoose.connect(process.env.MONGODB_URI, {
   serverSelectionTimeoutMS: 30000,
   socketTimeoutMS: 45000,
   tls: true,
-  tlsAllowInvalidCertificates: true
+  // tlsAllowInvalidCertificates: true
 })
   .then(() => {
     console.log('Connected to MongoDB');

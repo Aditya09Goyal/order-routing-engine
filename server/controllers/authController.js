@@ -3,14 +3,10 @@ const User = require('../models/User');
 
 exports.register = async (req, res) => {
   try {
-    const { username, password, role } = req.body;
+    const { username, password } = req.body; // any "role" sent by the browser is ignored on purpose
 
-    if (!username || !password || !role) {
-      return res.status(400).json({ success: false, message: 'Please provide username, password, and role' });
-    }
-
-    if (!['admin', 'manager'].includes(role)) {
-      return res.status(400).json({ success: false, message: 'Role must be admin or manager' });
+    if (!username || !password) {
+      return res.status(400).json({ success: false, message: 'Please provide username and password' });
     }
 
     const existingUser = await User.findOne({ username });
@@ -18,13 +14,15 @@ exports.register = async (req, res) => {
       return res.status(409).json({ success: false, message: 'Username already exists' });
     }
 
-    const newUser = new User({ username, password, role });
+    // SECURITY: public sign-up always creates a MANAGER.
+    // Admins are created only by the seed script (or promoted by an existing admin), never by sign-up.
+    const newUser = new User({ username, password, role: 'manager' });
     await newUser.save();
 
-    res.status(201).json({ 
-      success: true, 
-      data: { username: newUser.username, role: newUser.role }, 
-      message: 'User registered successfully' 
+    res.status(201).json({
+      success: true,
+      data: { username: newUser.username, role: newUser.role },
+      message: 'User registered successfully'
     });
 
   } catch (error) {
@@ -35,28 +33,22 @@ exports.register = async (req, res) => {
 
 exports.login = async (req, res) => {
   try {
-    const { username, password, role } = req.body;
+    const { username, password } = req.body; // the role comes from the database, not from the browser
 
-    if (!username || !password || !role) {
-      return res.status(400).json({ success: false, message: 'Please provide username, password, and role' });
+    if (!username || !password) {
+      return res.status(400).json({ success: false, message: 'Please provide username and password' });
     }
 
-    // Find user by both username and role
-    const user = await User.findOne({ username, role });
-    if (!user) {
-      return res.status(404).json({ success: false, message: `No ${role} account found with this username` });
-    }
-
-    // Check password
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      return res.status(401).json({ success: false, message: 'Invalid password' });
+    // Same message for "no such user" and "wrong password", so nobody can find out which usernames exist
+    const user = await User.findOne({ username });
+    if (!user || !(await user.comparePassword(password))) {
+      return res.status(401).json({ success: false, message: 'Invalid username or password' });
     }
 
     // Sign JWT
     const token = jwt.sign(
       { id: user._id, username: user.username, role: user.role },
-      process.env.JWT_SECRET || 'fallback_secret_if_missing',
+      process.env.JWT_SECRET,
       { expiresIn: '8h' }
     );
 
