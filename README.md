@@ -592,7 +592,6 @@ cd ../client && npm run dev      # dashboard on http://localhost:5173
 | Name | GitHub |
 | :-- | :-- |
 | Aditya Goyal | [@Aditya09Goyal](https://github.com/Aditya09Goyal) |
-| ayush14cyber | [@ayush14cyber](https://github.com/ayush14cyber) |
 
 <div align="center">
 
